@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { FileText, PenLine, Zap, Download, Shield, ArrowRight, ArrowLeft } from 'lucide-react';
+import { FileText, PenLine, Download, Shield, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StepIndicator } from '@/components/StepIndicator';
@@ -7,14 +7,16 @@ import { PdfDropzone } from '@/components/PdfDropzone';
 import { PdfList } from '@/components/PdfList';
 import { SignaturePad } from '@/components/SignaturePad';
 import { SignatureUpload } from '@/components/SignatureUpload';
+import { SignatureText } from '@/components/SignatureText';
 import { ManualEditor } from '@/components/ManualEditor';
 import { ExportPanel } from '@/components/ExportPanel';
+import { PaymentModal } from '@/components/PaymentModal';
+import { useSignatureLimit } from '@/hooks/useSignatureLimit';
 import { getPageCount } from '@/lib/pdfRender';
-import { findSignatureAnchor, calculateSignaturePlacement } from '@/lib/pdfTextAnchor';
 import { signPdf } from '@/lib/pdfSign';
 import type { PdfDocument, SignaturePlacement, AppState } from '@/types';
 
-const STEPS = ['Documentos', 'Assinatura', 'Processar', 'Revisar', 'Exportar'];
+const STEPS = ['Documentos', 'Assinatura', 'Posicionar', 'Exportar'];
 const MAX_DOCUMENTS = 20;
 
 const Index = () => {
@@ -27,6 +29,17 @@ const Index = () => {
   
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const {
+    usedSignatures,
+    isPremium,
+    remainingFree,
+    freeLimit,
+    checkLimitAndProceed,
+    incrementUsage,
+    showPaymentModal,
+    setShowPaymentModal,
+  } = useSignatureLimit();
   
   const editingDoc = editingDocId 
     ? state.documents.find(d => d.id === editingDocId) 
@@ -83,80 +96,28 @@ const Index = () => {
     }));
   }, []);
 
-  // Process documents
+  // Process documents - now just marks them for manual review
   const handleProcess = useCallback(async () => {
     if (!state.signature) return;
     
     setIsProcessing(true);
     
-    const updatedDocs = [...state.documents];
-    
-    for (let i = 0; i < updatedDocs.length; i++) {
-      const doc = updatedDocs[i];
-      if (doc.status === 'error') continue;
+    const updatedDocs = state.documents.map(doc => {
+      if (doc.status === 'error') return doc;
       
-      // Update status to processing
-      updatedDocs[i] = { ...doc, status: 'processing' };
-      setState(prev => ({ ...prev, documents: [...updatedDocs] }));
-      
-      try {
-        // Try to find signature anchor
-        const anchor = await findSignatureAnchor(doc.file);
-        
-        if (anchor) {
-          // Auto-found: calculate placement
-          const placement = calculateSignaturePlacement(anchor);
-          
-          // Get viewport size (we'll use a standard scale)
-          const scale = 1.5;
-          const viewportWidth = placement.width * scale + 200;
-          const viewportHeight = placement.height * scale + 200;
-          
-          updatedDocs[i] = {
-            ...doc,
-            status: 'auto-found',
-            placement: {
-              pageIndex: anchor.pageIndex,
-              uiRect: {
-                x: placement.x * scale,
-                y: placement.y * scale,
-                width: 200,
-                height: 80,
-              },
-              viewportSize: {
-                width: viewportWidth,
-                height: viewportHeight,
-              },
-            },
-          };
-        } else {
-          // Mark for manual review
-          updatedDocs[i] = {
-            ...doc,
-            status: 'review',
-            placement: {
-              pageIndex: doc.pageCount - 1, // Default to last page
-              uiRect: { x: 100, y: 100, width: 200, height: 80 },
-              viewportSize: { width: 800, height: 600 },
-            },
-          };
-        }
-      } catch (error) {
-        console.error('Error processing document:', error);
-        updatedDocs[i] = {
-          ...doc,
-          status: 'error',
-          errorMessage: 'Erro ao processar documento.',
-        };
-      }
-    }
+      return {
+        ...doc,
+        status: 'review' as const,
+        placement: {
+          pageIndex: doc.pageCount - 1, // Default to last page
+          uiRect: { x: 100, y: 100, width: 200, height: 80 },
+          viewportSize: { width: 800, height: 600 },
+        },
+      };
+    });
     
-    setState(prev => ({ ...prev, documents: updatedDocs }));
+    setState(prev => ({ ...prev, documents: updatedDocs, currentStep: 2 }));
     setIsProcessing(false);
-    
-    // Move to review step if any need manual review
-    const hasReview = updatedDocs.some(d => d.status === 'review');
-    setState(prev => ({ ...prev, currentStep: hasReview ? 3 : 4 }));
   }, [state.signature, state.documents]);
 
   // Apply signature placement from editor
@@ -193,13 +154,24 @@ const Index = () => {
   const handleSignAll = useCallback(async () => {
     if (!state.signature) return;
     
+    const docsToSign = state.documents.filter(d => 
+      (d.status === 'auto-found' || d.status === 'review') && d.placement
+    );
+    
+    // Check limit before signing
+    if (!checkLimitAndProceed(docsToSign.length)) {
+      return;
+    }
+    
     setIsProcessing(true);
     
     const updatedDocs = [...state.documents];
+    let signedCount = 0;
     
     for (let i = 0; i < updatedDocs.length; i++) {
       const doc = updatedDocs[i];
       if (doc.status === 'error' || !doc.placement) continue;
+      if (doc.status === 'signed') continue;
       
       try {
         updatedDocs[i] = { ...doc, status: 'processing' };
@@ -212,6 +184,7 @@ const Index = () => {
           status: 'signed',
           signedBlob,
         };
+        signedCount++;
       } catch (error) {
         console.error('Error signing document:', error);
         updatedDocs[i] = {
@@ -222,9 +195,14 @@ const Index = () => {
       }
     }
     
-    setState(prev => ({ ...prev, documents: updatedDocs, currentStep: 4 }));
+    // Increment usage after successful signing
+    if (signedCount > 0) {
+      incrementUsage(signedCount);
+    }
+    
+    setState(prev => ({ ...prev, documents: updatedDocs, currentStep: 3 }));
     setIsProcessing(false);
-  }, [state.signature, state.documents]);
+  }, [state.signature, state.documents, checkLimitAndProceed, incrementUsage]);
 
   // Navigation
   const canGoNext = useCallback(() => {
@@ -234,18 +212,16 @@ const Index = () => {
       case 1:
         return !!state.signature;
       case 2:
-        return true;
-      case 3:
-        return state.documents.some(d => d.status === 'auto-found' || d.status === 'signed');
+        return state.documents.some(d => d.status === 'auto-found' || d.status === 'review');
       default:
         return false;
     }
   }, [state.currentStep, state.documents, state.signature]);
 
   const goNext = useCallback(() => {
-    if (state.currentStep === 2) {
+    if (state.currentStep === 1) {
       handleProcess();
-    } else if (state.currentStep === 3) {
+    } else if (state.currentStep === 2) {
       handleSignAll();
     } else {
       setState(prev => ({ ...prev, currentStep: prev.currentStep + 1 }));
@@ -257,7 +233,7 @@ const Index = () => {
   }, []);
 
   const docsNeedingReview = state.documents.filter(d => d.status === 'review');
-  const docsReady = state.documents.filter(d => d.status === 'auto-found' || d.status === 'signed');
+  const docsReady = state.documents.filter(d => d.status === 'auto-found');
 
   return (
     <div className="min-h-screen bg-background">
@@ -275,9 +251,28 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Shield className="w-4 h-4" />
-              <span>Processamento local</span>
+            <div className="flex items-center gap-4">
+              {/* Usage indicator */}
+              {!isPremium && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full text-xs">
+                  <Sparkles className="w-3 h-3 text-primary" />
+                  <span className="text-muted-foreground">
+                    {remainingFree} assinatura{remainingFree !== 1 ? 's' : ''} restante{remainingFree !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+              
+              {isPremium && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full text-xs">
+                  <Sparkles className="w-3 h-3 text-primary" />
+                  <span className="text-primary font-medium">Premium</span>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Shield className="w-4 h-4" />
+                <span>Processamento local</span>
+              </div>
             </div>
           </div>
           
@@ -294,7 +289,7 @@ const Index = () => {
       </header>
       
       {/* Main content */}
-      <main className="container max-w-5xl mx-auto py-8 px-4">
+      <main className="container max-w-5xl mx-auto py-8 px-4 pb-24">
         {/* Step 0: Upload PDFs */}
         {state.currentStep === 0 && (
           <div className="space-y-6 animate-fade-in">
@@ -328,19 +323,27 @@ const Index = () => {
                 Defina sua assinatura
               </h2>
               <p className="text-muted-foreground">
-                Desenhe ou faça upload da sua assinatura
+                Desenhe, digite ou faça upload da sua assinatura
               </p>
             </div>
             
             <div className="max-w-2xl mx-auto">
               <Tabs defaultValue="draw" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="draw">Desenhar</TabsTrigger>
+                  <TabsTrigger value="type">Digitar</TabsTrigger>
                   <TabsTrigger value="upload">Upload</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="draw" className="mt-6">
                   <SignaturePad
+                    onSignatureCreate={handleSignatureCreate}
+                    existingSignature={state.signature}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="type" className="mt-6">
+                  <SignatureText
                     onSignatureCreate={handleSignatureCreate}
                     existingSignature={state.signature}
                   />
@@ -372,77 +375,15 @@ const Index = () => {
           </div>
         )}
         
-        {/* Step 2: Process */}
+        {/* Step 2: Position Signatures */}
         {state.currentStep === 2 && (
           <div className="space-y-6 animate-fade-in">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                Processar documentos
+                Posicione sua assinatura
               </h2>
               <p className="text-muted-foreground">
-                O sistema tentará encontrar automaticamente o campo de assinatura
-              </p>
-            </div>
-            
-            <div className="max-w-2xl mx-auto">
-              <div className="p-6 bg-card rounded-xl border border-border text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Zap className="w-8 h-8 text-primary" />
-                </div>
-                
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Pronto para processar
-                </h3>
-                
-                <p className="text-sm text-muted-foreground mb-6">
-                  {state.documents.filter(d => d.status !== 'error').length} documento(s) serão analisados.
-                  <br />
-                  Campos não encontrados automaticamente poderão ser definidos manualmente.
-                </p>
-                
-                <Button
-                  size="lg"
-                  onClick={handleProcess}
-                  disabled={isProcessing}
-                  className="min-w-40"
-                >
-                  {isProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4 mr-2" />
-                      Assinar automaticamente
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              <div className="mt-6">
-                <PdfList
-                  documents={state.documents}
-                  onRemove={() => {}}
-                  showActions={false}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Step 3: Review */}
-        {state.currentStep === 3 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Revisar posicionamento
-              </h2>
-              <p className="text-muted-foreground">
-                {docsNeedingReview.length > 0 
-                  ? `${docsNeedingReview.length} documento(s) precisam de revisão manual`
-                  : 'Todos os documentos estão prontos para assinar'
-                }
+                Clique em "Revisar" para posicionar a assinatura em cada documento
               </p>
             </div>
             
@@ -450,7 +391,7 @@ const Index = () => {
               {docsNeedingReview.length > 0 && (
                 <div className="mb-6">
                   <h3 className="text-sm font-medium text-foreground mb-3">
-                    Necessitam revisão manual:
+                    Documentos para posicionar ({docsNeedingReview.length}):
                   </h3>
                   <PdfList
                     documents={docsNeedingReview}
@@ -474,7 +415,7 @@ const Index = () => {
                 </div>
               )}
               
-              {docsReady.length > 0 && (
+              {(docsReady.length > 0 || docsNeedingReview.length > 0) && (
                 <div className="mt-6 text-center">
                   <Button
                     size="lg"
@@ -490,18 +431,24 @@ const Index = () => {
                     ) : (
                       <>
                         <PenLine className="w-4 h-4 mr-2" />
-                        Assinar {docsReady.length} documento(s)
+                        Assinar {docsReady.length + docsNeedingReview.length} documento(s)
                       </>
                     )}
                   </Button>
+                  
+                  {!isPremium && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Você usará {docsReady.length + docsNeedingReview.length} de suas {remainingFree} assinaturas restantes
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
         
-        {/* Step 4: Export */}
-        {state.currentStep === 4 && (
+        {/* Step 3: Export */}
+        {state.currentStep === 3 && (
           <div className="space-y-6 animate-fade-in">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-2">
@@ -536,21 +483,25 @@ const Index = () => {
             <span>{state.documents.length} documento(s)</span>
           </div>
           
-          {state.currentStep < 4 && (
+          {state.currentStep < 3 && (
             <Button
               onClick={goNext}
               disabled={!canGoNext() || isProcessing}
             >
-              {state.currentStep === 2 ? 'Processar' : 
-               state.currentStep === 3 ? 'Assinar' : 'Próximo'}
+              {state.currentStep === 2 ? 'Assinar' : 'Próximo'}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )}
           
-          {state.currentStep === 4 && (
+          {state.currentStep === 3 && (
             <Button
               variant="outline"
-              onClick={() => setState(prev => ({ ...prev, currentStep: 0 }))}
+              onClick={() => setState(prev => ({ 
+                ...prev, 
+                currentStep: 0,
+                documents: [],
+                signature: null,
+              }))}
             >
               Novo lote
             </Button>
@@ -568,6 +519,14 @@ const Index = () => {
           onCancel={() => setEditingDocId(null)}
         />
       )}
+      
+      {/* Payment Modal */}
+      <PaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        usedSignatures={usedSignatures}
+        freeLimit={freeLimit}
+      />
     </div>
   );
 };
