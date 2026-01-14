@@ -11,13 +11,16 @@ import { SignatureText } from '@/components/SignatureText';
 import { ManualEditor } from '@/components/ManualEditor';
 import { ExportPanel } from '@/components/ExportPanel';
 import { PaymentModal } from '@/components/PaymentModal';
-import { useSignatureLimit } from '@/hooks/useSignatureLimit';
+import { AuthModal } from '@/components/AuthModal';
+import { UserMenu } from '@/components/UserMenu';
+import { useAuth } from '@/hooks/useAuth';
 import { getPageCount } from '@/lib/pdfRender';
 import { signPdf } from '@/lib/pdfSign';
 import type { PdfDocument, SignaturePlacement, AppState } from '@/types';
 
 const STEPS = ['Documentos', 'Assinatura', 'Posicionar', 'Exportar'];
 const MAX_DOCUMENTS = 20;
+const FREE_LIMIT = 3;
 
 const Index = () => {
   const [state, setState] = useState<AppState>({
@@ -29,21 +32,37 @@ const Index = () => {
   
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
-  const {
-    usedSignatures,
-    isPremium,
-    remainingFree,
-    freeLimit,
-    checkLimitAndProceed,
-    incrementUsage,
-    showPaymentModal,
-    setShowPaymentModal,
-  } = useSignatureLimit();
+  const { user, profile, incrementSignaturesUsed } = useAuth();
+  
+  // Computed values from profile or defaults
+  const usedSignatures = profile?.signatures_used ?? 0;
+  const isPremium = profile?.is_premium ?? false;
+  const remainingFree = isPremium ? Infinity : Math.max(0, FREE_LIMIT - usedSignatures);
   
   const editingDoc = editingDocId 
     ? state.documents.find(d => d.id === editingDocId) 
     : null;
+
+  // Check if user can sign more documents
+  const canSign = useCallback((documentCount: number = 1): boolean => {
+    if (isPremium) return true;
+    return usedSignatures + documentCount <= FREE_LIMIT;
+  }, [usedSignatures, isPremium]);
+
+  // Check limit and show payment modal if needed
+  const checkLimitAndProceed = useCallback((documentCount: number = 1): boolean => {
+    if (isPremium) return true;
+    
+    if (usedSignatures + documentCount > FREE_LIMIT) {
+      setShowPaymentModal(true);
+      return false;
+    }
+    
+    return true;
+  }, [usedSignatures, isPremium]);
 
   // Add PDF files
   const handleFilesSelected = useCallback(async (files: File[]) => {
@@ -197,12 +216,12 @@ const Index = () => {
     
     // Increment usage after successful signing
     if (signedCount > 0) {
-      incrementUsage(signedCount);
+      incrementSignaturesUsed(signedCount);
     }
     
     setState(prev => ({ ...prev, documents: updatedDocs, currentStep: 3 }));
     setIsProcessing(false);
-  }, [state.signature, state.documents, checkLimitAndProceed, incrementUsage]);
+  }, [state.signature, state.documents, checkLimitAndProceed, incrementSignaturesUsed]);
 
   // Navigation
   const canGoNext = useCallback(() => {
@@ -253,26 +272,28 @@ const Index = () => {
             
             <div className="flex items-center gap-4">
               {/* Usage indicator */}
-              {!isPremium && (
+              {user && !isPremium && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full text-xs">
                   <Sparkles className="w-3 h-3 text-primary" />
                   <span className="text-muted-foreground">
-                    {remainingFree} assinatura{remainingFree !== 1 ? 's' : ''} restante{remainingFree !== 1 ? 's' : ''}
+                    {remainingFree === Infinity ? '∞' : remainingFree} assinatura{remainingFree !== 1 ? 's' : ''} restante{remainingFree !== 1 ? 's' : ''}
                   </span>
                 </div>
               )}
               
-              {isPremium && (
+              {user && isPremium && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full text-xs">
                   <Sparkles className="w-3 h-3 text-primary" />
                   <span className="text-primary font-medium">Premium</span>
                 </div>
               )}
               
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield className="w-4 h-4" />
                 <span>Processamento local</span>
               </div>
+              
+              <UserMenu onLoginClick={() => setShowAuthModal(true)} />
             </div>
           </div>
           
@@ -436,7 +457,7 @@ const Index = () => {
                     )}
                   </Button>
                   
-                  {!isPremium && (
+                  {!isPremium && user && (
                     <p className="text-xs text-muted-foreground mt-2">
                       Você usará {docsReady.length + docsNeedingReview.length} de suas {remainingFree} assinaturas restantes
                     </p>
@@ -460,7 +481,11 @@ const Index = () => {
             </div>
             
             <div className="max-w-2xl mx-auto">
-              <ExportPanel documents={state.documents} />
+              <ExportPanel 
+                documents={state.documents} 
+                isLoggedIn={!!user}
+                onLoginClick={() => setShowAuthModal(true)}
+              />
             </div>
           </div>
         )}
@@ -523,9 +548,16 @@ const Index = () => {
       {/* Payment Modal */}
       <PaymentModal
         open={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        onOpenChange={setShowPaymentModal}
         usedSignatures={usedSignatures}
-        freeLimit={freeLimit}
+        freeLimit={FREE_LIMIT}
+        onLoginClick={() => setShowAuthModal(true)}
+      />
+      
+      {/* Auth Modal */}
+      <AuthModal
+        open={showAuthModal}
+        onOpenChange={setShowAuthModal}
       />
     </div>
   );
