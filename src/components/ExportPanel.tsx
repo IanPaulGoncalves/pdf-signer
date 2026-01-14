@@ -1,17 +1,28 @@
 import React from 'react';
-import { Download, FileArchive, CheckCircle } from 'lucide-react';
+import { Download, FileArchive, CheckCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadBlob, createZipFromDocuments } from '@/lib/zipExport';
 import type { PdfDocument } from '@/types';
 
 interface ExportPanelProps {
   documents: PdfDocument[];
+  isLoggedIn: boolean;
+  onLoginClick: () => void;
 }
 
-export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
+export const ExportPanel: React.FC<ExportPanelProps> = ({ 
+  documents, 
+  isLoggedIn,
+  onLoginClick 
+}) => {
   const signedDocs = documents.filter(doc => doc.status === 'signed' && doc.signedBlob);
   
   const handleDownloadSingle = (doc: PdfDocument) => {
+    if (!isLoggedIn) {
+      onLoginClick();
+      return;
+    }
+    
     if (doc.signedBlob) {
       const signedName = doc.name.replace(/\.pdf$/i, '_assinado.pdf');
       downloadBlob(doc.signedBlob, signedName);
@@ -19,6 +30,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
   };
   
   const handleDownloadAll = async () => {
+    if (!isLoggedIn) {
+      onLoginClick();
+      return;
+    }
+    
     try {
       const zipBlob = await createZipFromDocuments(documents);
       downloadBlob(zipBlob, 'documentos_assinados.zip');
@@ -37,6 +53,27 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
   
   return (
     <div className="space-y-6">
+      {!isLoggedIn && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Lock className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                Faça login para baixar
+              </p>
+              <p className="text-sm text-muted-foreground">
+                É necessário estar logado para baixar os documentos assinados.
+              </p>
+            </div>
+            <Button onClick={onLoginClick}>
+              Fazer login
+            </Button>
+          </div>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
@@ -78,8 +115,17 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
               size="sm"
               onClick={() => handleDownloadSingle(doc)}
             >
-              <Download className="w-4 h-4 mr-2" />
-              Baixar
+              {isLoggedIn ? (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Baixar
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Login
+                </>
+              )}
             </Button>
           </div>
         ))}
