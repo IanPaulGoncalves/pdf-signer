@@ -16,6 +16,7 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emailConfirmationPending, setEmailConfirmationPending] = useState(false);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -81,6 +82,11 @@ export const useAuth = () => {
       },
     });
     
+    // Check if email confirmation is required
+    if (!error && data.user && !data.session) {
+      setEmailConfirmationPending(true);
+    }
+    
     return { data, error };
   };
 
@@ -101,6 +107,37 @@ export const useAuth = () => {
       setProfile(null);
     }
     return { error };
+  };
+
+  // Reset password (send email)
+  const resetPassword = async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    return { data, error };
+  };
+
+  // Update password (after receiving reset email)
+  const updatePassword = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    
+    return { data, error };
+  };
+
+  // Resend confirmation email
+  const resendConfirmationEmail = async (email: string) => {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    
+    return { data, error };
   };
 
   // Update signatures used
@@ -149,8 +186,11 @@ export const useAuth = () => {
 
       if (profileError) throw profileError;
 
-      // Update local state
+      // Update local state immediately
       setProfile(prev => prev ? { ...prev, is_premium: true, access_key: accessKey } : null);
+
+      // Also refetch to ensure consistency
+      await fetchProfile(user.id);
 
       return { success: true, accessKey };
     } catch (error) {
@@ -164,9 +204,13 @@ export const useAuth = () => {
     session,
     profile,
     loading,
+    emailConfirmationPending,
     signUp,
     signIn,
     signOut,
+    resetPassword,
+    updatePassword,
+    resendConfirmationEmail,
     incrementSignaturesUsed,
     simulatePurchase,
     refetchProfile: () => user && fetchProfile(user.id),
