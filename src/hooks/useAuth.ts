@@ -82,23 +82,9 @@ export const useAuth = () => {
       },
     });
     
-    // Check if email confirmation is required
+    // Check if email confirmation is required (auto-confirm is enabled)
     if (!error && data.user && !data.session) {
       setEmailConfirmationPending(true);
-      
-      // Send custom email via edge function
-      const confirmationUrl = `${window.location.origin}/auth/confirm?token=${data.user.confirmation_sent_at}`;
-      try {
-        await supabase.functions.invoke('send-auth-email', {
-          body: {
-            email,
-            type: 'confirmation',
-            confirmationUrl: `${window.location.origin}`,
-          },
-        });
-      } catch (emailError) {
-        console.error('Error sending confirmation email:', emailError);
-      }
     }
     
     return { data, error };
