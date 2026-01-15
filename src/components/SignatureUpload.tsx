@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import { Upload, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/useTheme';
 
 interface SignatureUploadProps {
   onSignatureUpload: (dataUrl: string) => void;
@@ -15,6 +16,7 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [preview, setPreview] = React.useState<string | null>(null);
+  const { effectiveTheme } = useTheme();
 
   const processFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -25,7 +27,7 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
-      
+
       // Convert to PNG if not already
       const img = new window.Image();
       img.onload = () => {
@@ -58,7 +60,7 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (file) {
       processFile(file);
@@ -84,7 +86,7 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
         <Image className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">Upload de imagem</span>
       </div>
-      
+
       <div
         className={cn(
           'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all',
@@ -102,14 +104,17 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
           className="hidden"
           onChange={handleFileChange}
         />
-        
+
         {currentSignature ? (
           <div className="space-y-3">
-            <img
-              src={currentSignature}
-              alt="Assinatura"
-              className="max-h-24 mx-auto object-contain"
-            />
+            <div className={`p-2 rounded ${effectiveTheme === 'dark' ? 'bg-white' : 'bg-transparent'
+              }`}>
+              <img
+                src={currentSignature}
+                alt="Assinatura"
+                className="max-h-24 mx-auto object-contain"
+              />
+            </div>
             <p className="text-sm text-muted-foreground">
               Clique ou arraste para substituir
             </p>
@@ -130,7 +135,7 @@ export const SignatureUpload: React.FC<SignatureUploadProps> = ({
           </div>
         )}
       </div>
-      
+
       {currentSignature && (
         <Button
           variant="outline"

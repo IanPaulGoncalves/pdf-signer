@@ -15,6 +15,7 @@ import { AuthModal } from '@/components/AuthModal';
 import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/useTheme';
 import { getPageCount } from '@/lib/pdfRender';
 import { signPdf } from '@/lib/pdfSign';
 import type { PdfDocument, SignaturePlacement, AppState } from '@/types';
@@ -37,6 +38,7 @@ const Index = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const { user, profile, incrementSignaturesUsed } = useAuth();
+  const { effectiveTheme } = useTheme();
 
   // Computed values from profile or defaults
   const usedSignatures = profile?.signatures_used ?? 0;
@@ -399,7 +401,8 @@ const Index = () => {
                   <p className="text-sm font-medium text-foreground mb-3">
                     Prévia da assinatura:
                   </p>
-                  <div className="bg-muted p-4 rounded-lg">
+                  <div className={`p-4 rounded-lg ${effectiveTheme === 'dark' ? 'bg-white' : 'bg-muted'
+                    }`}>
                     <img
                       src={state.signature}
                       alt="Assinatura"

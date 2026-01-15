@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useTheme } from '@/hooks/useTheme';
 
 interface SignatureTextProps {
   onSignatureCreate: (dataUrl: string) => void;
@@ -39,23 +40,24 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
   const [selectedColor, setSelectedColor] = useState(SIGNATURE_COLORS[0].value);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { effectiveTheme } = useTheme();
 
   // Load Google Fonts
   useEffect(() => {
-    const fontLinks = SIGNATURE_FONTS.map(font => 
+    const fontLinks = SIGNATURE_FONTS.map(font =>
       `family=${font.value.replace(' ', '+')}`
     ).join('&');
-    
+
     const link = document.createElement('link');
     link.href = `https://fonts.googleapis.com/css2?${fontLinks}&display=swap`;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-    
+
     link.onload = () => {
       // Give fonts time to render
       setTimeout(() => setFontsLoaded(true), 100);
     };
-    
+
     return () => {
       document.head.removeChild(link);
     };
@@ -64,27 +66,27 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
   // Generate signature image
   const generateSignature = () => {
     if (!text.trim() || !canvasRef.current) return;
-    
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Set canvas size
     canvas.width = 600;
     canvas.height = 200;
-    
+
     // Clear canvas (transparent background)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Set font
     ctx.font = `64px "${selectedFont}", cursive`;
     ctx.fillStyle = selectedColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
+
     // Draw text
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    
+
     // Get data URL
     const dataUrl = canvas.toDataURL('image/png');
     onSignatureCreate(dataUrl);
@@ -96,7 +98,7 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
         <Type className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">Digite sua assinatura</span>
       </div>
-      
+
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="signature-text">Seu nome ou assinatura</Label>
@@ -108,7 +110,7 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
             className="text-lg"
           />
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Estilo da fonte</Label>
@@ -127,7 +129,7 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="space-y-2">
             <Label>Cor</Label>
             <Select value={selectedColor} onValueChange={setSelectedColor}>
@@ -138,7 +140,7 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
                 {SIGNATURE_COLORS.map((color) => (
                   <SelectItem key={color.value} value={color.value}>
                     <div className="flex items-center gap-2">
-                      <div 
+                      <div
                         className="w-4 h-4 rounded-full border border-border"
                         style={{ backgroundColor: color.value }}
                       />
@@ -151,14 +153,15 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
           </div>
         </div>
       </div>
-      
+
       {/* Preview */}
       {text && (
-        <div className="border-2 border-dashed border-border rounded-lg bg-card p-6">
+        <div className={`border-2 border-dashed border-border rounded-lg p-6 ${effectiveTheme === 'dark' ? 'bg-white' : 'bg-card'
+          }`}>
           <p className="text-xs text-muted-foreground mb-2 text-center">Prévia:</p>
-          <div 
+          <div
             className="text-4xl text-center py-4"
-            style={{ 
+            style={{
               fontFamily: `"${selectedFont}", cursive`,
               color: selectedColor,
             }}
@@ -167,10 +170,10 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* Hidden canvas for generating image */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      
+
       <Button
         onClick={generateSignature}
         disabled={!text.trim() || !fontsLoaded}
@@ -179,7 +182,7 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
         <Download className="w-4 h-4 mr-2" />
         Salvar assinatura
       </Button>
-      
+
       {existingSignature && (
         <div className="p-3 bg-success/10 rounded-lg border border-success/30">
           <p className="text-sm text-success font-medium">✓ Assinatura salva</p>

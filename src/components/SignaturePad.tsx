@@ -2,20 +2,22 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Eraser, Download, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { useTheme } from '@/hooks/useTheme';
 
 interface SignaturePadProps {
   onSignatureCreate: (dataUrl: string) => void;
   existingSignature?: string | null;
 }
 
-export const SignaturePad: React.FC<SignaturePadProps> = ({ 
+export const SignaturePad: React.FC<SignaturePadProps> = ({
   onSignatureCreate,
-  existingSignature 
+  existingSignature
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [hasDrawn, setHasDrawn] = useState(false);
+  const { effectiveTheme } = useTheme();
 
   const getContext = useCallback(() => {
     const canvas = canvasRef.current;
@@ -32,11 +34,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   const getCoordinates = useCallback((e: React.MouseEvent | React.TouchEvent): { x: number; y: number } | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    
+
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    
+
     if ('touches' in e) {
       const touch = e.touches[0];
       return {
@@ -44,7 +46,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
         y: (touch.clientY - rect.top) * scaleY,
       };
     }
-    
+
     return {
       x: (e.clientX - rect.left) * scaleX,
       y: (e.clientY - rect.top) * scaleY,
@@ -55,10 +57,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     e.preventDefault();
     const coords = getCoordinates(e);
     if (!coords) return;
-    
+
     const ctx = getContext();
     if (!ctx) return;
-    
+
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
     setIsDrawing(true);
@@ -67,13 +69,13 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
     e.preventDefault();
-    
+
     const coords = getCoordinates(e);
     if (!coords) return;
-    
+
     const ctx = getContext();
     if (!ctx) return;
-    
+
     ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
     setHasDrawn(true);
@@ -95,17 +97,17 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   const saveSignature = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     // Create a temporary canvas with white background
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) return;
-    
+
     // Don't fill with white - keep transparent for PNG
     tempCtx.drawImage(canvas, 0, 0);
-    
+
     const dataUrl = tempCanvas.toDataURL('image/png');
     onSignatureCreate(dataUrl);
   }, [onSignatureCreate]);
@@ -114,7 +116,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     // Set canvas resolution
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * 2;
@@ -142,8 +144,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           </div>
         </div>
       </div>
-      
-      <div className="border-2 border-dashed border-border rounded-lg bg-card overflow-hidden">
+
+      <div className={`border-2 border-dashed border-border rounded-lg overflow-hidden ${effectiveTheme === 'dark' ? 'bg-white' : 'bg-card'
+        }`}>
         <canvas
           ref={canvasRef}
           className="w-full h-48 touch-none cursor-crosshair"
@@ -156,7 +159,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           onTouchEnd={stopDrawing}
         />
       </div>
-      
+
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -175,7 +178,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           Salvar assinatura
         </Button>
       </div>
-      
+
       {existingSignature && (
         <div className="p-3 bg-success/10 rounded-lg border border-success/30">
           <p className="text-sm text-success font-medium">✓ Assinatura salva</p>
