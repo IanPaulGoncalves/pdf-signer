@@ -13,6 +13,7 @@ import { ExportPanel } from '@/components/ExportPanel';
 import { PaymentModal } from '@/components/PaymentModal';
 import { AuthModal } from '@/components/AuthModal';
 import { UserMenu } from '@/components/UserMenu';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import { getPageCount } from '@/lib/pdfRender';
 import { signPdf } from '@/lib/pdfSign';
@@ -305,6 +306,8 @@ const Index = () => {
                 <Shield className="w-4 h-4" />
                 <span>Processamento local</span>
               </div>
+
+              <ThemeToggle />
 
               <UserMenu onLoginClick={() => setShowAuthModal(true)} />
             </div>
