@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Type, Download, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +92,39 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
     onSignatureCreate(dataUrl);
   };
 
+  const downloadSignature = useCallback(() => {
+    if (!text.trim() || !fontsLoaded) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    canvas.width = 400;
+    canvas.height = 150;
+
+    // Fill with white background for download
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Set font
+    ctx.font = `64px "${selectedFont}", cursive`;
+    ctx.fillStyle = selectedColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Draw text
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    // Download the image
+    const link = document.createElement('a');
+    link.download = `assinatura-${text.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }, [text, selectedFont, selectedColor, fontsLoaded]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
@@ -174,14 +207,27 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
       {/* Hidden canvas for generating image */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      <Button
-        onClick={generateSignature}
-        disabled={!text.trim() || !fontsLoaded}
-        className="w-full"
-      >
-        <Download className="w-4 h-4 mr-2" />
-        Salvar assinatura
-      </Button>
+      <div className="space-y-2">
+        <Button
+          onClick={generateSignature}
+          disabled={!text.trim() || !fontsLoaded}
+          className="w-full"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Usar assinatura
+        </Button>
+
+        {text.trim() && fontsLoaded && (
+          <Button
+            variant="outline"
+            onClick={downloadSignature}
+            className="w-full"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Baixar assinatura (.png)
+          </Button>
+        )}
+      </div>
 
       {existingSignature && (
         <div className="p-3 bg-success/10 rounded-lg border border-success/30">

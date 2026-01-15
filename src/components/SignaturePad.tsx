@@ -112,6 +112,29 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     onSignatureCreate(dataUrl);
   }, [onSignatureCreate]);
 
+  const downloadSignature = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Create a temporary canvas with white background for download
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+
+    // Fill with white background for download
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
+
+    // Download the image
+    const link = document.createElement('a');
+    link.download = `assinatura-${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+  }, []);
+
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -121,6 +144,12 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * 2;
     canvas.height = rect.height * 2;
+
+    // Ensure transparent background
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
   }, []);
 
   return (
@@ -175,9 +204,21 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           className="flex-1"
         >
           <Download className="w-4 h-4 mr-2" />
-          Salvar assinatura
+          Usar assinatura
         </Button>
       </div>
+
+      {(hasDrawn || existingSignature) && (
+        <Button
+          variant="outline"
+          onClick={downloadSignature}
+          disabled={!hasDrawn}
+          className="w-full"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Baixar assinatura (.png)
+        </Button>
+      )}
 
       {existingSignature && (
         <div className="p-3 bg-success/10 rounded-lg border border-success/30">
