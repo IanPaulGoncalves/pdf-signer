@@ -2,7 +2,9 @@
 
 ## Visão Geral do Projeto
 
-Este é um aplicativo web React/TypeScript para assinatura de documentos PDF, construído com tecnologias modernas e hospedado na plataforma Lovable. O projeto implementa um sistema completo de assinatura digital com autenticação de usuários, limitação de uso gratuito/premium e processamento local de PDFs.
+Este é um aplicativo web React/TypeScript para assinatura visual de documentos PDF, construído com tecnologias modernas e hospedado na plataforma Lovable. O projeto implementa um sistema completo de assinatura visual com autenticação de usuários, limitação de uso gratuito/premium e processamento local de PDFs.
+
+**IMPORTANTE**: O aplicativo oferece assinatura visual/gráfica (inserção de imagem da assinatura no PDF), não assinatura digital certificada com validação criptográfica.
 
 ## Stack Tecnológico
 

@@ -2,39 +2,44 @@ import React from 'react';
 import { Download, FileArchive, CheckCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadBlob, createZipFromDocuments } from '@/lib/zipExport';
+import { PdfPreviewModal } from '@/components/PdfPreviewModal';
 import type { PdfDocument } from '@/types';
 
 interface ExportPanelProps {
   documents: PdfDocument[];
   isLoggedIn: boolean;
+  isPremium: boolean;
   onLoginClick: () => void;
+  onUpgradeClick: () => void;
 }
 
-export const ExportPanel: React.FC<ExportPanelProps> = ({ 
-  documents, 
+export const ExportPanel: React.FC<ExportPanelProps> = ({
+  documents,
   isLoggedIn,
-  onLoginClick 
+  isPremium,
+  onLoginClick,
+  onUpgradeClick,
 }) => {
   const signedDocs = documents.filter(doc => doc.status === 'signed' && doc.signedBlob);
-  
+
   const handleDownloadSingle = (doc: PdfDocument) => {
     if (!isLoggedIn) {
       onLoginClick();
       return;
     }
-    
+
     if (doc.signedBlob) {
       const signedName = doc.name.replace(/\.pdf$/i, '_assinado.pdf');
       downloadBlob(doc.signedBlob, signedName);
     }
   };
-  
+
   const handleDownloadAll = async () => {
     if (!isLoggedIn) {
       onLoginClick();
       return;
     }
-    
+
     try {
       const zipBlob = await createZipFromDocuments(documents);
       downloadBlob(zipBlob, 'documentos_assinados.zip');
@@ -42,7 +47,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       console.error('Error creating ZIP:', error);
     }
   };
-  
+
   if (signedDocs.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -50,7 +55,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {!isLoggedIn && (
@@ -73,7 +78,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </div>
         </div>
       )}
-      
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
@@ -83,7 +88,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             {signedDocs.length} documento{signedDocs.length > 1 ? 's' : ''} assinado{signedDocs.length > 1 ? 's' : ''}
           </p>
         </div>
-        
+
         {signedDocs.length > 1 && (
           <Button onClick={handleDownloadAll} variant="default">
             <FileArchive className="w-4 h-4 mr-2" />
@@ -91,7 +96,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </Button>
         )}
       </div>
-      
+
       <div className="space-y-2">
         {signedDocs.map(doc => (
           <div
@@ -109,28 +114,36 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                 </p>
               </div>
             </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownloadSingle(doc)}
-            >
-              {isLoggedIn ? (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Baixar
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4 mr-2" />
-                  Login
-                </>
-              )}
-            </Button>
+
+            <div className="flex gap-2">
+              <PdfPreviewModal
+                document={doc}
+                isPremium={isPremium}
+                isLoggedIn={isLoggedIn}
+                onUpgrade={onUpgradeClick}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadSingle(doc)}
+              >
+                {isLoggedIn ? (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Baixar
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Login
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         ))}
       </div>
-      
+
       <div className="p-4 bg-muted/50 rounded-lg border border-border">
         <p className="text-xs text-muted-foreground text-center">
           🔒 Todos os arquivos foram processados localmente no seu navegador.

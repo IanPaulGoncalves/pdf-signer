@@ -1,4 +1,40 @@
-# Welcome to your Lovable project
+# PDF Signer - Assinatura Visual de PDFs
+
+Uma aplicação web moderna para adicionar assinaturas visuais a documentos PDF de forma local e privada.
+
+## ⚠️ Importante: Tipo de Assinatura
+
+**Este aplicativo oferece assinatura visual/gráfica, não assinatura digital certificada.**
+
+- ✅ **Ideal para:** Documentos internos, formulários, contratos simples, situações onde não é necessária validação criptográfica
+- ❌ **Não é adequada para:** Documentos oficiais que exigem certificação digital, transações bancárias, documentos legais que necessitam de verificação criptográfica
+
+A assinatura é inserida como uma imagem no PDF, mantendo a privacidade dos seus documentos através do processamento local.
+
+## Funcionalidades
+
+- 🖊️ **Três tipos de assinatura visual:**
+  - Desenho manual com canvas interativo
+  - Assinatura tipográfica com fontes elegantes
+  - Upload de imagem da sua assinatura
+
+- 🎯 **Campos Inteligentes (NOVO):**
+  - Detecção automática de campos de assinatura em PDFs
+  - Busca por palavras-chave como "assinatura", "responsável", "testemunha"
+  - Palavras-chave personalizáveis pelo usuário
+  - Economia de tempo no posicionamento de assinaturas
+
+- 📄 **Recursos do aplicativo:**
+  - Processamento 100% local (seus PDFs nunca saem do seu dispositivo)
+  - Upload múltiplo de documentos (até 20 arquivos)
+  - Posicionamento preciso da assinatura
+  - Exportação individual ou em lote (ZIP)
+  - Interface responsiva para desktop e mobile
+
+- 👤 **Sistema de usuários:**
+  - Contas gratuitas: 3 assinaturas por conta
+  - Contas premium: assinaturas ilimitadas
+  - Autenticação segura via Supabase
 
 ## Project info
 
