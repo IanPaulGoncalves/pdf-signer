@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, LogOut, Key, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, LogOut, Key, Sparkles, MessageSquare } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { FeedbackModal } from './FeedbackModal';
 
 interface UserMenuProps {
   onLoginClick: () => void;
@@ -18,6 +19,7 @@ interface UserMenuProps {
 
 export const UserMenu: React.FC<UserMenuProps> = ({ onLoginClick }) => {
   const { user, profile, signOut, loading } = useAuth();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -65,14 +67,14 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onLoginClick }) => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
+
         {profile && (
           <>
             <DropdownMenuItem disabled className="flex justify-between">
               <span>Assinaturas usadas:</span>
               <span className="font-medium">{profile.signatures_used}</span>
             </DropdownMenuItem>
-            
+
             <DropdownMenuItem disabled className="flex justify-between">
               <span>Status:</span>
               {profile.is_premium ? (
@@ -84,7 +86,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onLoginClick }) => {
                 <span className="text-muted-foreground">Gratuito</span>
               )}
             </DropdownMenuItem>
-            
+
             {profile.access_key && (
               <DropdownMenuItem disabled className="flex flex-col items-start gap-1">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -96,16 +98,24 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onLoginClick }) => {
                 </code>
               </DropdownMenuItem>
             )}
-            
+
             <DropdownMenuSeparator />
           </>
         )}
-        
+
+        <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
+          <MessageSquare className="w-4 h-4 mr-2" />
+          Enviar feedback
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
           <LogOut className="w-4 h-4 mr-2" />
           Sair
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </DropdownMenu>
   );
 };

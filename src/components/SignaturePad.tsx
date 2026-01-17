@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Eraser, Download, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTheme } from '@/hooks/useTheme';
 
 interface SignaturePadProps {
@@ -190,22 +191,32 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          onClick={clearCanvas}
-          className="flex-1"
-        >
-          <Eraser className="w-4 h-4 mr-2" />
-          Limpar
-        </Button>
-        <Button
-          onClick={saveSignature}
-          disabled={!hasDrawn}
-          className="flex-1"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Usar assinatura
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={clearCanvas}
+              className="flex-1"
+            >
+              <Eraser className="w-4 h-4 mr-2" />
+              Limpar
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Limpar o canvas e começar novamente</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={saveSignature}
+              disabled={!hasDrawn}
+              className="flex-1"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Usar assinatura
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Salvar e usar esta assinatura nos documentos</TooltipContent>
+        </Tooltip>
       </div>
 
       {(hasDrawn || existingSignature) && (

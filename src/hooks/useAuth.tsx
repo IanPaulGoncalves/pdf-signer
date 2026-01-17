@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,7 +11,26 @@ interface Profile {
   access_key: string | null;
 }
 
-export const useAuth = () => {
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  profile: Profile | null;
+  loading: boolean;
+  emailConfirmationPending: boolean;
+  signUp: (email: string, password: string) => Promise<any>;
+  signIn: (email: string, password: string) => Promise<any>;
+  signOut: () => Promise<any>;
+  resetPassword: (email: string) => Promise<any>;
+  updatePassword: (newPassword: string) => Promise<any>;
+  resendConfirmationEmail: (email: string) => Promise<any>;
+  incrementSignaturesUsed: (count?: number) => Promise<void>;
+  simulatePurchase: () => Promise<any>;
+  refetchProfile: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -38,36 +57,43 @@ export const useAuth = () => {
 
   // Initialize auth state
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let mounted = true;
+
+    // Get initial session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+
+      setLoading(false);
+    });
+
+    // Set up auth state listener for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Use setTimeout to avoid race conditions
-          setTimeout(() => fetchProfile(session.user.id), 100);
-        } else {
+
+        // Fetch profile on sign in or token refresh
+        if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+          fetchProfile(session.user.id);
+        } else if (!session?.user) {
           setProfile(null);
         }
-        
+
         setLoading(false);
       }
     );
 
-    // Then get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      
-      setLoading(false);
-    });
-
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
@@ -81,11 +107,11 @@ export const useAuth = () => {
         emailRedirectTo: window.location.origin,
       },
     });
-    
+
     // Check if email confirmation is required
     if (!error && data.user && !data.session) {
       setEmailConfirmationPending(true);
-      
+
       // Send custom email via edge function
       const confirmationUrl = `${window.location.origin}/auth/confirm?token=${data.user.confirmation_sent_at}`;
       try {
@@ -100,7 +126,7 @@ export const useAuth = () => {
         console.error('Error sending confirmation email:', emailError);
       }
     }
-    
+
     return { data, error };
   };
 
@@ -110,7 +136,7 @@ export const useAuth = () => {
       email,
       password,
     });
-    
+
     return { data, error };
   };
 
@@ -128,7 +154,7 @@ export const useAuth = () => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    
+
     return { data, error };
   };
 
@@ -137,7 +163,7 @@ export const useAuth = () => {
     const { data, error } = await supabase.auth.updateUser({
       password: newPassword,
     });
-    
+
     return { data, error };
   };
 
@@ -150,16 +176,16 @@ export const useAuth = () => {
         emailRedirectTo: window.location.origin,
       },
     });
-    
+
     return { data, error };
   };
 
   // Update signatures used
   const incrementSignaturesUsed = async (count: number = 1) => {
     if (!user || !profile) return;
-    
+
     const newCount = profile.signatures_used + count;
-    
+
     const { error } = await supabase
       .from('profiles')
       .update({ signatures_used: newCount })
@@ -192,7 +218,7 @@ export const useAuth = () => {
       // Update profile to premium
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           is_premium: true,
           access_key: accessKey,
         })
@@ -213,7 +239,7 @@ export const useAuth = () => {
     }
   };
 
-  return {
+  const value = {
     user,
     session,
     profile,
@@ -229,4 +255,14 @@ export const useAuth = () => {
     simulatePurchase,
     refetchProfile: () => user && fetchProfile(user.id),
   };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

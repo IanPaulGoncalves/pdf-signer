@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { FileText, PenLine, Shield, ArrowRight, ArrowLeft, Sparkles, Check, AlertCircle, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { StepIndicator } from '@/components/StepIndicator';
 import { PdfDropzone } from '@/components/PdfDropzone';
 import { PdfList } from '@/components/PdfList';
@@ -16,6 +17,7 @@ import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SmartFieldsConfig } from '@/components/SmartFieldsConfig';
 import { SignaturePreview } from '@/components/SignaturePreview';
+import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { getPageCount, getPageDimensions } from '@/lib/pdfRender';
@@ -534,6 +536,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <OnboardingTutorial isLoggedIn={!!user} />
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container max-w-5xl mx-auto py-6 px-4">
@@ -566,10 +569,15 @@ const Index = () => {
                 </div>
               )}
 
-              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-                <Shield className="w-4 h-4" />
-                <span>Processamento local</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground cursor-help">
+                    <Shield className="w-4 h-4" />
+                    <span>Processamento local</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Seus PDFs são processados localmente no navegador, garantindo privacidade</TooltipContent>
+              </Tooltip>
 
               <SmartFieldsConfig />
 
@@ -638,9 +646,24 @@ const Index = () => {
             <div className="max-w-2xl mx-auto">
               <Tabs defaultValue="draw" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="draw">Desenhar</TabsTrigger>
-                  <TabsTrigger value="type">Digitar</TabsTrigger>
-                  <TabsTrigger value="upload">Upload</TabsTrigger>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="draw">Desenhar</TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Desenhe sua assinatura com o mouse ou touch</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="type">Digitar</TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Digite seu nome para criar uma assinatura textual</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="upload">Upload</TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Faça upload de uma imagem da sua assinatura</TooltipContent>
+                  </Tooltip>
                 </TabsList>
 
                 <TabsContent value="draw" className="mt-6">
@@ -975,14 +998,19 @@ const Index = () => {
       {/* Footer navigation */}
       <footer className="fixed bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-sm">
         <div className="container max-w-5xl mx-auto py-4 px-4 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={goPrev}
-            disabled={state.currentStep === 0}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Anterior
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={goPrev}
+                disabled={state.currentStep === 0}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Anterior
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Voltar para a etapa anterior</TooltipContent>
+          </Tooltip>
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FileText className="w-4 h-4" />
@@ -990,35 +1018,49 @@ const Index = () => {
           </div>
 
           {state.currentStep < 3 && (
-            <Button
-              onClick={goNext}
-              disabled={!canGoNext() || isProcessing}
-            >
-              {state.currentStep === 2 ? (
-                docsSigned.length > 0 && docsReady.length === 0 && docsNeedingReview.length === 0
-                  ? 'Próximo'
-                  : 'Assinar'
-              ) : 'Próximo'}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={goNext}
+                  disabled={!canGoNext() || isProcessing}
+                >
+                  {state.currentStep === 2 ? (
+                    docsSigned.length > 0 && docsReady.length === 0 && docsNeedingReview.length === 0
+                      ? 'Próximo'
+                      : 'Assinar'
+                  ) : 'Próximo'}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {state.currentStep === 0 && 'Adicione documentos para continuar'}
+                {state.currentStep === 1 && 'Crie sua assinatura para continuar'}
+                {state.currentStep === 2 && 'Assinar todos os documentos'}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {state.currentStep === 3 && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setState(prev => ({
-                  ...prev,
-                  currentStep: 0,
-                  documents: [],
-                  signature: null,
-                }));
-                setReviewedDocs(new Set());
-                setShowPreview(false);
-              }}
-            >
-              Novo lote
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setState(prev => ({
+                      ...prev,
+                      currentStep: 0,
+                      documents: [],
+                      signature: null,
+                    }));
+                    setReviewedDocs(new Set());
+                    setShowPreview(false);
+                  }}
+                >
+                  Novo lote
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reiniciar e assinar novos documentos</TooltipContent>
+            </Tooltip>
           )}
         </div>
       </footer>

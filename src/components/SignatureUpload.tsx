@@ -1,6 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { Upload, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 

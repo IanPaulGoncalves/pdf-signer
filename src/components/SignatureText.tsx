@@ -3,6 +3,7 @@ import { Type, Download, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -208,14 +209,19 @@ export const SignatureText: React.FC<SignatureTextProps> = ({
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       <div className="space-y-2">
-        <Button
-          onClick={generateSignature}
-          disabled={!text.trim() || !fontsLoaded}
-          className="w-full"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Usar assinatura
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={generateSignature}
+              disabled={!text.trim() || !fontsLoaded}
+              className="w-full"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Usar assinatura
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Gerar e usar esta assinatura textual nos documentos</TooltipContent>
+        </Tooltip>
 
         {text.trim() && fontsLoaded && (
           <Button

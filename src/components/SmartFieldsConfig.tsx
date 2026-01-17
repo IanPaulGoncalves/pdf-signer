@@ -3,6 +3,7 @@ import { Search, Plus, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Dialog,
     DialogContent,
@@ -54,12 +55,17 @@ export const SmartFieldsConfig: React.FC = () => {
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Campos Inteligentes
-                </Button>
-            </DialogTrigger>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Campos Inteligentes
+                        </Button>
+                    </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Configurar detecção automática de campos de assinatura</TooltipContent>
+            </Tooltip>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Configurar Campos Inteligentes</DialogTitle>

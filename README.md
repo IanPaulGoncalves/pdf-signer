@@ -36,74 +36,103 @@ A assinatura é inserida como uma imagem no PDF, mantendo a privacidade dos seus
   - Contas premium: assinaturas ilimitadas
   - Autenticação segura via Supabase
 
-## Project info
+# PDF Signer - Assinatura Visual de PDFs
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Uma aplicação web moderna para adicionar assinaturas visuais a documentos PDF de forma local e privada.
 
-## How can I edit this code?
+## ⚠️ Importante: Tipo de Assinatura
 
-There are several ways of editing your application.
+**Este aplicativo oferece assinatura visual/gráfica, não assinatura digital certificada.**
 
-**Use Lovable**
+- ✅ **Ideal para:** Documentos internos, formulários, contratos simples, situações onde não é necessária validação criptográfica
+- ❌ **Não é adequada para:** Documentos oficiais que exigem certificação digital, transações bancárias, documentos legais que necessitam de verificação criptográfica
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+A assinatura é inserida como uma imagem no PDF, mantendo a privacidade dos seus documentos através do processamento local.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Funcionalidades
 
-**Use your preferred IDE**
+- 🖊️ **Três tipos de assinatura visual:**
+  - Desenho manual com canvas interativo
+  - Assinatura tipográfica com fontes elegantes
+  - Upload de imagem da sua assinatura
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- 🎯 **Campos Inteligentes (NOVO):**
+  - Detecção automática de campos de assinatura em PDFs
+  - Busca por palavras-chave como "assinatura", "responsável", "testemunha"
+  - Palavras-chave personalizáveis pelo usuário
+  - Economia de tempo no posicionamento de assinaturas
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- 📄 **Recursos do aplicativo:**
+  - Processamento 100% local (seus PDFs nunca saem do seu dispositivo)
+  - Upload múltiplo de documentos (até 20 arquivos)
+  - Posicionamento preciso da assinatura
+  - Exportação individual ou em lote (ZIP)
+  - Interface responsiva para desktop e mobile
 
-Follow these steps:
+- 👤 **Sistema de usuários:**
+  - Contas gratuitas: 3 assinaturas por conta
+  - Contas premium: assinaturas ilimitadas
+  - Autenticação segura via Supabase
+
+## Como executar localmente
+
+Para executar este projeto em sua máquina:
+
+### Pré-requisitos
+
+- [Node.js](https://nodejs.org/) ou [Bun](https://bun.sh/) instalado
+- Conta no [Supabase](https://supabase.com/) para banco de dados
+
+### Instalação
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 1. Clone o repositório
+git clone <URL_DO_SEU_REPOSITORIO>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 2. Entre no diretório do projeto
+cd pdf-signer
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Instale as dependências
+bun install
+# ou: npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# 4. Configure as variáveis de ambiente
+# Crie um arquivo .env com suas credenciais do Supabase
+
+# 5. Execute o projeto em modo desenvolvimento
+bun run dev
+# ou: npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Tecnologias Utilizadas
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **Frontend:** React 18 + TypeScript + Vite
+- **UI:** TailwindCSS + shadcn/ui + Radix UI
+- **Backend:** Supabase (PostgreSQL + Auth + Edge Functions)
+- **PDF:** pdf-lib + PDF.js
+- **Build:** Vite + Bun
 
-**Use GitHub Codespaces**
+## Deploy
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Este projeto pode ser facilmente deployed em plataformas como:
+- [Vercel](https://vercel.com/)
+- [Netlify](https://netlify.com/)
+- [GitHub Pages](https://pages.github.com/)
 
-## What technologies are used for this project?
+## Licença
 
-This project is built with:
+Este projeto está sob licença MIT.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Contribuição
 
-## How can I deploy this project?
+Contribuições são bem-vindas! Por favor:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+1. Fork o projeto
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Desenvolvido com ❤️ para simplificar a assinatura de documentos PDF**
