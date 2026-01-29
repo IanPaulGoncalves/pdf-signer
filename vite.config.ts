@@ -20,4 +20,17 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  assetsInclude: ['**/*.pdf'],
+  define: {
+    global: 'globalThis',
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'pdfjs': ['pdfjs-dist'],
+        },
+      },
+    },
+  },
 });

@@ -23,6 +23,7 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
+  const renderTaskRef = useRef<any>(null);
   
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(document.placement?.pageIndex ?? document.pageCount - 1);
@@ -45,11 +46,23 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
   useEffect(() => {
     const loadDoc = async () => {
       try {
+        console.log('🔄 Iniciando carregamento do PDF...', {
+          fileName: document.file.name,
+          fileSize: document.file.size,
+          fileType: document.file.type
+        });
+        setIsLoading(true);
+        setError(null);
+        
         const doc = await loadPdfDocument(document.file);
+        console.log('✅ PDF carregado com sucesso:', {
+          numPages: doc.numPages,
+          fingerprints: doc.fingerprints
+        });
         setPdfDoc(doc);
       } catch (err) {
-        console.error('Error loading PDF:', err);
-        setError('Erro ao carregar o PDF');
+        console.error('❌ Erro ao carregar PDF:', err);
+        setError(`Erro ao carregar o PDF: ${err.message || err}`);
       }
     };
     loadDoc();
@@ -58,30 +71,96 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
   // Render current page
   useEffect(() => {
     const renderPage = async () => {
-      if (!pdfDoc || !canvasRef.current) return;
+      if (!pdfDoc || !canvasRef.current) {
+        console.log('⏸️ Aguardando PDF ou canvas...', {
+          pdfDoc: !!pdfDoc,
+          canvas: !!canvasRef.current
+        });
+        return;
+      }
+      
+      // Cancelar renderização anterior se existir
+      if (renderTaskRef.current) {
+        console.log('🛑 Cancelando renderização anterior');
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
       
       setIsLoading(true);
       setError(null);
       
       try {
-        const { width, height } = await renderPageToCanvas(pdfDoc, currentPage, canvasRef.current, scale);
-        setViewportSize({ width, height });
+        console.log('🎨 Iniciando renderização da página:', {
+          pageIndex: currentPage,
+          scale,
+          canvasElement: canvasRef.current
+        });
         
-        // Ensure signature stays within bounds
-        setSignaturePos(prev => ({
-          x: Math.min(prev.x, Math.max(0, width - signatureSize.width)),
-          y: Math.min(prev.y, Math.max(0, height - signatureSize.height)),
-        }));
-      } catch (err) {
-        console.error('Error rendering page:', err);
-        setError('Erro ao renderizar página');
+        const canvas = canvasRef.current;
+        const page = await pdfDoc.getPage(currentPage + 1);
+        const viewport = page.getViewport({ scale });
+        
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Could not get 2d context');
+        }
+        
+        // Limpar o canvas antes de renderizar
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Iniciar nova renderização e armazenar a tarefa
+        renderTaskRef.current = page.render({
+          canvasContext: ctx,
+          viewport: viewport,
+        });
+        
+        await renderTaskRef.current.promise;
+        renderTaskRef.current = null;
+        
+        console.log('✅ Página renderizada com sucesso:', { 
+          width: viewport.width, 
+          height: viewport.height 
+        });
+        
+        setViewportSize({ width: viewport.width, height: viewport.height });
+        
+        // Ensure signature stays within bounds (apenas se necessário)
+        setSignaturePos(prev => {
+          const newX = Math.min(prev.x, Math.max(0, viewport.width - signatureSize.width));
+          const newY = Math.min(prev.y, Math.max(0, viewport.height - signatureSize.height));
+          
+          // Só atualizar se realmente mudou
+          if (newX !== prev.x || newY !== prev.y) {
+            return { x: newX, y: newY };
+          }
+          return prev;
+        });
+      } catch (err: any) {
+        if (err.name === 'RenderingCancelledException') {
+          console.log('⚠️ Renderização cancelada (esperado)');
+          return;
+        }
+        console.error('❌ Erro ao renderizar página:', err);
+        setError(`Erro ao renderizar página: ${err.message || err}`);
       } finally {
         setIsLoading(false);
       }
     };
     
     renderPage();
-  }, [pdfDoc, currentPage, scale]);
+    
+    // Cleanup: cancelar renderização ao desmontar ou antes de nova renderização
+    return () => {
+      if (renderTaskRef.current) {
+        console.log('🧹 Limpeza: cancelando renderização');
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
+    };
+  }, [pdfDoc, currentPage, scale]); // Removido signatureSize das dependências
 
   const handleDrag = useCallback((_e: DraggableEvent, data: DraggableData) => {
     setSignaturePos({ x: data.x, y: data.y });
@@ -99,9 +178,14 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const newWidth = Math.max(50, startWidth + deltaX);
+      const newWidth = Math.max(50, Math.min(viewportSize.width - signaturePos.x, startWidth + deltaX));
       const newHeight = newWidth / aspectRatio;
-      setSignatureSize({ width: newWidth, height: newHeight });
+      
+      // Garantir que a assinatura não saia dos limites
+      const maxHeight = viewportSize.height - signaturePos.y;
+      if (newHeight <= maxHeight) {
+        setSignatureSize({ width: newWidth, height: newHeight });
+      }
     };
     
     const handleMouseUp = () => {
@@ -112,7 +196,7 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
     
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [signatureSize]);
+  }, [signatureSize, viewportSize, signaturePos]);
 
   const handleApply = useCallback(() => {
     const placement: SignaturePlacement = {
