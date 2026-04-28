@@ -32,7 +32,6 @@ Para executar este projeto em sua máquina:
 ### Pré-requisitos
 
 - [Node.js](https://nodejs.org/) ou [Bun](https://bun.sh/) instalado
-- Conta no [Supabase](https://supabase.com/) para banco de dados
 
 ### Instalação
 
