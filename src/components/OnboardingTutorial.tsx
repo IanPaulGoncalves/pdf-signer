@@ -62,12 +62,7 @@ export const OnboardingTutorial: React.FC = () => {
     ];
 
     return (
-        <Dialog open={open && !isLoggedIn} onOpenChange={(newOpen) => {
-            // Só permite abrir se não estiver logado
-            if (!isLoggedIn) {
-                setOpen(newOpen);
-            }
-        }}>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="sr-only">Tutorial do PDF Signer</DialogTitle>
