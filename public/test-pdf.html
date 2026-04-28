@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste PDF.js</title>
+</head>
+<body>
+    <h1>Teste PDF.js</h1>
+    <input type="file" id="fileInput" accept=".pdf" />
+    <canvas id="pdfCanvas" style="border: 1px solid #ccc; margin-top: 10px;"></canvas>
+    <div id="status"></div>
+
+    <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+    <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js';
+
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('pdfCanvas');
+        const status = document.getElementById('status');
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                status.textContent = 'Carregando PDF...';
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                
+                console.log('PDF carregado:', pdf);
+                status.textContent = `PDF carregado! ${pdf.numPages} páginas`;
+                
+                // Renderizar primeira página
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                const ctx = canvas.getContext('2d');
+                await page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                }).promise;
+                
+                status.textContent = 'PDF renderizado com sucesso!';
+                console.log('PDF renderizado com sucesso');
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                status.textContent = `Erro: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
