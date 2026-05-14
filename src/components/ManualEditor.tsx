@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut, Copy } from 'lucide-react';
 import Draggable, { DraggableData, DraggableEvent } from 'react-draggable';
 import { Button } from '@/components/ui/button';
-import { loadPdfDocument, renderPageToCanvas, type PDFDocumentProxy } from '@/lib/pdfRenderer';
+import { loadPdfDocument, type PDFDocumentProxy } from '@/lib/pdfRenderer';
 import type { PdfDocument, SignaturePlacement } from '@/types';
 
 interface ManualEditorProps {
@@ -59,22 +59,13 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
   useEffect(() => {
     const loadDoc = async () => {
       try {
-        console.log('🔄 Iniciando carregamento do PDF...', {
-          fileName: document.file.name,
-          fileSize: document.file.size,
-          fileType: document.file.type
-        });
         setIsLoading(true);
         setError(null);
         
         const doc = await loadPdfDocument(document.file);
-        console.log('✅ PDF carregado com sucesso:', {
-          numPages: doc.numPages,
-          fingerprints: doc.fingerprints
-        });
         setPdfDoc(doc);
-      } catch (err) {
-        console.error('❌ Erro ao carregar PDF:', err);
+      } catch (err: any) {
+        console.error('Erro ao carregar PDF:', err);
         setError(`Erro ao carregar o PDF: ${err.message || err}`);
       }
     };
@@ -84,17 +75,10 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
   // Render current page
   useEffect(() => {
     const renderPage = async () => {
-      if (!pdfDoc || !canvasRef.current) {
-        console.log('⏸️ Aguardando PDF ou canvas...', {
-          pdfDoc: !!pdfDoc,
-          canvas: !!canvasRef.current
-        });
-        return;
-      }
+      if (!pdfDoc || !canvasRef.current) return;
       
       // Cancelar renderização anterior se existir
       if (renderTaskRef.current) {
-        console.log('🛑 Cancelando renderização anterior');
         renderTaskRef.current.cancel();
         renderTaskRef.current = null;
       }
@@ -103,12 +87,6 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
       setError(null);
       
       try {
-        console.log('🎨 Iniciando renderização da página:', {
-          pageIndex: currentPage,
-          scale,
-          canvasElement: canvasRef.current
-        });
-        
         const canvas = canvasRef.current;
         const page = await pdfDoc.getPage(currentPage + 1);
         const viewport = page.getViewport({ scale });
@@ -133,11 +111,6 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
         await renderTaskRef.current.promise;
         renderTaskRef.current = null;
         
-        console.log('✅ Página renderizada com sucesso:', { 
-          width: viewport.width, 
-          height: viewport.height 
-        });
-        
         setViewportSize({ width: viewport.width, height: viewport.height });
         
         // Ensure signature stays within bounds (em coordenadas base)
@@ -156,10 +129,9 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
         });
       } catch (err: any) {
         if (err.name === 'RenderingCancelledException') {
-          console.log('⚠️ Renderização cancelada (esperado)');
           return;
         }
-        console.error('❌ Erro ao renderizar página:', err);
+        console.error('Erro ao renderizar página:', err);
         setError(`Erro ao renderizar página: ${err.message || err}`);
       } finally {
         setIsLoading(false);
@@ -171,7 +143,6 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
     // Cleanup: cancelar renderização ao desmontar ou antes de nova renderização
     return () => {
       if (renderTaskRef.current) {
-        console.log('🧹 Limpeza: cancelando renderização');
         renderTaskRef.current.cancel();
         renderTaskRef.current = null;
       }
@@ -228,6 +199,12 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
     };
     
     const placement: SignaturePlacement = {
+      id: document.placement?.id,
+      type: document.placement?.type || 'signature',
+      source: document.placement?.source || 'manual',
+      label: document.placement?.label,
+      anchorText: document.placement?.anchorText,
+      confidence: document.placement?.confidence,
       pageIndex: currentPage,
       uiRect: { 
         x: signaturePosBase.x, 
@@ -248,6 +225,12 @@ export const ManualEditor: React.FC<ManualEditorProps> = ({
     };
     
     const placement: SignaturePlacement = {
+      id: document.placement?.id,
+      type: document.placement?.type || 'signature',
+      source: document.placement?.source || 'manual',
+      label: document.placement?.label,
+      anchorText: document.placement?.anchorText,
+      confidence: document.placement?.confidence,
       pageIndex: currentPage,
       uiRect: { 
         x: signaturePosBase.x, 

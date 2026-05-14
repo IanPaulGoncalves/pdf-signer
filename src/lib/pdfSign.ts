@@ -4,7 +4,7 @@ import type { SignaturePlacement } from '../types';
 export async function signPdf(
   file: File,
   signatureDataUrl: string,
-  placement: SignaturePlacement
+  placementOrPlacements: SignaturePlacement | SignaturePlacement[]
 ): Promise<Blob> {
   const fileBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(fileBuffer);
@@ -20,49 +20,38 @@ export async function signPdf(
   } else {
     signatureImage = await pdfDoc.embedPng(signatureBytes);
   }
-  
-  // Get the page
+
+  const placements = Array.isArray(placementOrPlacements)
+    ? placementOrPlacements
+    : [placementOrPlacements];
+
   const pages = pdfDoc.getPages();
-  const page = pages[placement.pageIndex];
-  
-  if (!page) {
-    throw new Error(`Page ${placement.pageIndex} not found`);
+
+  for (const placement of placements) {
+    const page = pages[placement.pageIndex];
+
+    if (!page) {
+      throw new Error(`Page ${placement.pageIndex} not found`);
+    }
+
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const { uiRect, viewportSize } = placement;
+
+    const scaleX = pageWidth / viewportSize.width;
+    const scaleY = pageHeight / viewportSize.height;
+
+    const pdfX = uiRect.x * scaleX;
+    const pdfWidth = uiRect.width * scaleX;
+    const pdfHeight = uiRect.height * scaleY;
+    const pdfY = pageHeight - (uiRect.y * scaleY) - pdfHeight;
+
+    page.drawImage(signatureImage, {
+      x: pdfX,
+      y: pdfY,
+      width: pdfWidth,
+      height: pdfHeight,
+    });
   }
-  
-  const { width: pageWidth, height: pageHeight } = page.getSize();
-  
-  // Convert UI coordinates to PDF coordinates
-  // UI: origin top-left, PDF: origin bottom-left
-  const { uiRect, viewportSize } = placement;
-  
-  // Calculate scale factors between viewport and actual PDF dimensions
-  const scaleX = pageWidth / viewportSize.width;
-  const scaleY = pageHeight / viewportSize.height;
-  
-  // Convert position and size
-  const pdfX = uiRect.x * scaleX;
-  const pdfWidth = uiRect.width * scaleX;
-  const pdfHeight = uiRect.height * scaleY;
-  
-  // Convert Y: In UI, y=0 is at top. In PDF, y=0 is at bottom.
-  // UI y represents distance from top, so we need to flip it
-  const pdfY = pageHeight - (uiRect.y * scaleY) - pdfHeight;
-  
-  console.log('Signing PDF:', {
-    pageSize: { pageWidth, pageHeight },
-    viewport: viewportSize,
-    uiRect,
-    scale: { scaleX, scaleY },
-    pdfCoords: { x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight }
-  });
-  
-  // Draw the signature
-  page.drawImage(signatureImage, {
-    x: pdfX,
-    y: pdfY,
-    width: pdfWidth,
-    height: pdfHeight,
-  });
   
   // Save and return as Blob
   const pdfBytes = await pdfDoc.save();

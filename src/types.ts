@@ -6,7 +6,16 @@ export type DocumentStatus =
   | 'signed' 
   | 'error';
 
+export type PlacementType = 'signature' | 'initials';
+export type PlacementSource = 'manual' | 'smart' | 'template' | 'initials';
+
 export interface SignaturePlacement {
+  id?: string;
+  type?: PlacementType;
+  label?: string;
+  source?: PlacementSource;
+  confidence?: number;
+  anchorText?: string;
   pageIndex: number;
   uiRect: {
     x: number;
@@ -35,6 +44,7 @@ export interface PdfDocument {
   status: DocumentStatus;
   errorMessage?: string;
   placement?: SignaturePlacement;
+  placements?: SignaturePlacement[];
   signedBlob?: Blob;
 }
 
@@ -45,11 +55,16 @@ export interface AnchorMatch {
   y: number;
   width: number;
   height: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  score?: number;
+  confidence?: number;
 }
 
 export interface AppState {
   documents: PdfDocument[];
   signature: string | null; // base64 data URL
+  initialsSignature?: string | null;
   currentStep: number;
   maxDocuments: number;
 }

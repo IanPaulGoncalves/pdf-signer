@@ -1,66 +1,57 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import type { AnchorMatch } from '../types';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { AnchorMatch, SignaturePlacement } from '../types';
 
-// Configure PDF.js worker - Use CDN with https
-if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-// Default keywords to search for signature fields - More comprehensive list
 const DEFAULT_KEYWORDS = [
-  // Portuguese - Common
   'assinatura',
+  'assinaturas',
+  'assine aqui',
   'assinar',
-  'assinado',
-  'assine',
+  'assinado por',
+  'responsavel',
   'responsável',
   'testemunha',
   'declarante',
   'contratante',
   'contratado',
   'locador',
+  'locatario',
   'locatário',
-  'signatário',
-  'de acordo',
-
-  // Portuguese - Roles
-  'diretor',
-  'gerente',
-  'coordenador',
-  'supervisor',
   'representante',
   'procurador',
-
-  // Portuguese - Actions
-  'autorizado',
-  'aprovado',
-  'validado',
-  'confirmado',
-
-  // Common signature lines
-  '___________________',
-  '__________________',
-  '_________________',
-  '________________',
-  '______',
-  '_____',
-
-  // English
+  'de acordo',
+  'aprovado por',
   'signature',
   'sign here',
   'signed by',
   'authorized by',
   'approved by',
-  'signed',
-  'signer',
-  'authorized',
-  'approved',
+  '_____',
 ];
 
-// Storage key for custom keywords
+const HIGH_PRIORITY_KEYWORDS = [
+  'assinatura:',
+  'assinaturas:',
+  'assine aqui',
+  'sign here',
+  'signature:',
+  'signed by',
+  '_____',
+];
+
+const FALSE_POSITIVE_KEYWORDS = [
+  'contratante:',
+  'contratada:',
+  'contratado:',
+  'locador:',
+  'locatario:',
+  'locatário:',
+];
+
 const CUSTOM_KEYWORDS_KEY = 'pdf-signer-custom-keywords';
 
-// Get custom keywords from localStorage
 export function getCustomKeywords(): string[] {
   try {
     const stored = localStorage.getItem(CUSTOM_KEYWORDS_KEY);
@@ -70,44 +61,26 @@ export function getCustomKeywords(): string[] {
   }
 }
 
-// Save custom keywords to localStorage
 export function saveCustomKeywords(keywords: string[]): void {
   try {
     localStorage.setItem(CUSTOM_KEYWORDS_KEY, JSON.stringify(keywords));
   } catch (error) {
-    console.error('Failed to save custom keywords:', error);
+    console.error('Falha ao salvar palavras-chave personalizadas:', error);
   }
 }
 
-// Get all keywords (default + custom)
 export function getAllKeywords(): string[] {
-  const custom = getCustomKeywords();
-  return [...DEFAULT_KEYWORDS, ...custom];
+  return Array.from(new Set([...DEFAULT_KEYWORDS, ...getCustomKeywords()].map(k => k.toLowerCase())));
 }
 
-// High-priority keywords that strongly indicate signature fields
-const HIGH_PRIORITY_KEYWORDS = [
-  'assinaturas:',
-  'assinatura:',
-  'assine aqui',
-  'sign here',
-  'signature:',
-  'signatures:',
-  '___________________', // Signature lines
-  '__________________',
-  '_________________',
-];
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
 
-// Keywords that often appear in contracts but are NOT signature fields
-const FALSE_POSITIVE_KEYWORDS = [
-  'contratada:',
-  'contratante:',
-  'contratado:',
-  'locador:',
-  'locatário:',
-];
-
-// Calculate relevance score for a potential signature field
 function calculateFieldScore(
   text: string,
   keyword: string,
@@ -115,186 +88,172 @@ function calculateFieldScore(
   totalPages: number,
   nearbyText: string[]
 ): number {
+  const normalizedText = normalizeText(text);
+  const normalizedKeyword = normalizeText(keyword);
   let score = 0;
 
-  const textLower = text.toLowerCase().trim();
-
-  // Penalize false positives heavily
-  if (FALSE_POSITIVE_KEYWORDS.some(fp => textLower.includes(fp))) {
-    score -= 50;
+  if (FALSE_POSITIVE_KEYWORDS.some(fp => normalizedText.includes(normalizeText(fp)))) {
+    score -= 35;
   }
 
-  // Higher score for matches on last pages (signatures usually at end)
-  const pageScore = (pageIndex + 1) / totalPages;
-  score += pageScore * 35;
+  if (HIGH_PRIORITY_KEYWORDS.some(k => normalizedText.includes(normalizeText(k)))) {
+    score += 55;
+  }
 
-  // Bonus for last 2 pages
+  if (normalizedText === normalizedKeyword) {
+    score += 25;
+  } else if (normalizedText.includes(normalizedKeyword)) {
+    score += 15;
+  }
+
+  const pagePosition = (pageIndex + 1) / totalPages;
+  score += pagePosition * 30;
+
   if (pageIndex >= totalPages - 2) {
     score += 20;
   }
 
-  // Higher score for high-priority keywords
-  if (HIGH_PRIORITY_KEYWORDS.includes(keyword.toLowerCase())) {
-    score += 60;
-  }
-
-  // Higher score if near signature lines (underscores)
-  const hasSignatureLine = nearbyText.some(t => t.includes('____') || t.includes('___'));
-  if (hasSignatureLine) {
+  const hasLineNearby = nearbyText.some(t => t.includes('___'));
+  if (hasLineNearby || normalizedText.includes('___')) {
     score += 45;
   }
 
-  // Higher score if in a section labeled "ASSINATURAS" or similar
-  const inSignatureSection = nearbyText.some(t => {
-    const tl = t.toLowerCase();
-    return tl.includes('assinaturas') ||
-      tl.includes('signatures') ||
-      tl === 'assinaturas:' ||
-      tl === 'signatures:';
+  const hasSignatureSection = nearbyText.some(t => {
+    const normalized = normalizeText(t);
+    return normalized.includes('assinatura') || normalized.includes('signature');
   });
-  if (inSignatureSection) {
-    score += 50;
+  if (hasSignatureSection) {
+    score += 30;
   }
 
-  // Exact match gets higher score (but not for false positives)
-  if (textLower === keyword.toLowerCase() && !FALSE_POSITIVE_KEYWORDS.includes(textLower)) {
-    score += 25;
-  }
-
-  // Lower score for fields in the middle of sentences
-  if (text.includes(':') && !text.endsWith(':') && textLower !== 'assinaturas:') {
-    score -= 30;
-  }
-
-  // Bonus if the text itself is "ASSINATURAS:" or similar section headers
-  if (textLower === 'assinaturas:' || textLower === 'assinatura:' || textLower === 'signatures:') {
-    score += 40;
+  if (normalizedText.length > 80) {
+    score -= 25;
   }
 
   return score;
 }
 
-// Extract text from PDF and find ALL potential signature anchors
+function createPageIndexes(totalPages: number, maxPages: number): number[] {
+  const indexes = new Set<number>();
+  const lastPagesStart = Math.max(0, totalPages - maxPages);
+
+  for (let i = lastPagesStart; i < totalPages; i++) {
+    indexes.add(i);
+  }
+
+  // Check the first page too because many forms have a signature field there.
+  indexes.add(0);
+  return Array.from(indexes).sort((a, b) => a - b);
+}
+
+function dedupeMatches(matches: AnchorMatch[]): AnchorMatch[] {
+  const seen = new Set<string>();
+  return matches.filter(match => {
+    const key = `${match.pageIndex}:${Math.round(match.x / 8)}:${Math.round(match.y / 8)}:${normalizeText(match.text)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function findAllSignatureAnchors(
   file: File,
   maxPages: number = 8
 ): Promise<AnchorMatch[]> {
-  const matches: (AnchorMatch & { score: number })[] = [];
+  const matches: AnchorMatch[] = [];
 
   try {
-    console.log('[SmartFields] Finding all potential signature fields for:', file.name);
-
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-    const pagesToCheck = Math.min(pdf.numPages, maxPages);
     const keywords = getAllKeywords();
+    const pageIndexes = createPageIndexes(pdf.numPages, maxPages);
 
-    console.log(`[SmartFields] Checking ${pagesToCheck} pages with ${keywords.length} keywords`);
-
-    // Search all pages
-    for (let i = 0; i < pagesToCheck; i++) {
-      const page = await pdf.getPage(i + 1);
+    for (const pageIndex of pageIndexes) {
+      const page = await pdf.getPage(pageIndex + 1);
+      const viewport = page.getViewport({ scale: 1 });
       const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1.0 });
-
       const textItems = textContent.items.filter(item => 'str' in item);
+      const allText = textItems.map((item: any) => item.str || '');
 
-      // Get nearby text for context
-      const allText = textItems.map((item: any) => item.str.toLowerCase());
-
-      console.log(`[SmartFields] Page ${i + 1}: Found ${textItems.length} text items`);
-
-      for (let j = 0; j < textItems.length; j++) {
-        const item = textItems[j] as any;
-        const text = item.str.toLowerCase().trim();
-
+      for (let i = 0; i < textItems.length; i++) {
+        const item = textItems[i] as any;
+        const rawText = String(item.str || '').trim();
+        const text = normalizeText(rawText);
         if (!text || text.length < 2) continue;
 
-        // Get nearby text (5 items before and after)
-        const nearbyText = allText.slice(Math.max(0, j - 5), Math.min(allText.length, j + 6));
+        const matchedKeyword = keywords.find(keyword => {
+          const normalizedKeyword = normalizeText(keyword);
+          return text.includes(normalizedKeyword) || (normalizedKeyword.includes('___') && text.includes('___'));
+        });
 
-        for (const keyword of keywords) {
-          const keywordLower = keyword.toLowerCase();
+        if (!matchedKeyword) continue;
 
-          if (text === keywordLower || text.includes(keywordLower)) {
-            const transform = item.transform;
-            let x = transform[4];
-            let y = viewport.height - transform[5];
+        const nearbyText = allText.slice(Math.max(0, i - 6), Math.min(allText.length, i + 7));
+        const transform = item.transform || [1, 0, 0, 1, 80, 80];
+        const itemX = Number(transform[4]) || 80;
+        const itemY = viewport.height - (Number(transform[5]) || 80);
+        const isLine = rawText.includes('___') || matchedKeyword.includes('___');
+        const score = calculateFieldScore(rawText, matchedKeyword, pageIndex, pdf.numPages, nearbyText);
 
-            const isSignatureLine = keyword.includes('_');
-            if (!isSignatureLine) {
-              y = y + (item.height || 20);
-            }
+        const x = Math.max(32, Math.min(itemX, viewport.width - 220));
+        const yOffset = isLine ? -58 : 16;
+        const y = Math.max(32, Math.min(itemY + yOffset, viewport.height - 96));
+        const confidence = Math.max(0, Math.min(100, Math.round(score)));
 
-            x = Math.max(50, Math.min(x, viewport.width - 250));
-            y = Math.max(50, Math.min(y, viewport.height - 130));
+        if (confidence < 35) continue;
 
-            const score = calculateFieldScore(text, keyword, i, pdf.numPages, nearbyText);
-
-            matches.push({
-              text: item.str,
-              pageIndex: i,
-              x: x,
-              y: y,
-              width: item.width || 200,
-              height: item.height || 20,
-              score: score,
-            });
-
-            console.log(`[SmartFields] Found potential field: "${item.str}" on page ${i + 1}, score: ${score.toFixed(1)}`);
-          }
-        }
+        matches.push({
+          text: rawText,
+          pageIndex,
+          x,
+          y,
+          width: Math.max(Number(item.width) || 180, 180),
+          height: Math.max(Number(item.height) || 18, 18),
+          viewportWidth: viewport.width,
+          viewportHeight: viewport.height,
+          score,
+          confidence,
+        });
       }
     }
 
-    // Sort by score (highest first)
-    matches.sort((a, b) => b.score - a.score);
-
-    console.log(`[SmartFields] Found ${matches.length} potential fields, best score: ${matches[0]?.score.toFixed(1)}`);
-
-    return matches;
+    return dedupeMatches(matches).sort((a, b) => (b.score || 0) - (a.score || 0));
   } catch (error) {
-    console.error('[SmartFields] Error finding signature anchors:', error);
+    console.error('Erro ao detectar campos de assinatura:', error);
     return [];
   }
 }
 
-// Extract text from PDF and find the BEST signature anchor
 export async function findSignatureAnchor(
   file: File,
   maxPages: number = 8
 ): Promise<AnchorMatch | null> {
-  const allMatches = await findAllSignatureAnchors(file, maxPages);
-
-  if (allMatches.length === 0) {
-    console.log('[SmartFields] No signature field found');
-    return null;
-  }
-
-  // Return the best match (highest score)
-  const best = allMatches[0];
-  console.log(`[SmartFields] ✓ Best match: "${best.text}" on page ${best.pageIndex + 1}, score: ${(best as any).score.toFixed(1)}`);
-
-  // Remove score before returning
-  const { score, ...match } = best as any;
-  return match;
+  const matches = await findAllSignatureAnchors(file, maxPages);
+  return matches[0] || null;
 }
 
 export function calculateSignaturePlacement(
   anchor: AnchorMatch,
   signatureWidth: number = 200,
-  signatureHeight: number = 80,
-  offsetY: number = 15
-): { x: number; y: number; width: number; height: number } {
-  // Calculate optimal position based on anchor
-  const x = anchor.x;
-  const y = anchor.y + offsetY; // Already adjusted in findSignatureAnchor
-
+  signatureHeight: number = 80
+): SignaturePlacement {
   return {
-    x: Math.max(0, x),
-    y: Math.max(0, y),
-    width: signatureWidth,
-    height: signatureHeight,
+    id: `smart-${anchor.pageIndex}-${Math.round(anchor.x)}-${Math.round(anchor.y)}`,
+    type: 'signature',
+    source: 'smart',
+    label: anchor.text || 'Campo detectado',
+    anchorText: anchor.text,
+    confidence: anchor.confidence,
+    pageIndex: anchor.pageIndex,
+    uiRect: {
+      x: Math.max(0, anchor.x),
+      y: Math.max(0, anchor.y),
+      width: signatureWidth,
+      height: signatureHeight,
+    },
+    viewportSize: {
+      width: anchor.viewportWidth || 612,
+      height: anchor.viewportHeight || 792,
+    },
   };
 }

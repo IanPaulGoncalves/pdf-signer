@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileArchive, CheckCircle } from 'lucide-react';
+import { CheckCircle, Download, FileArchive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadBlob, createZipFromDocuments } from '@/lib/zipExport';
 import { PdfPreviewModal } from '@/components/PdfPreviewModal';
@@ -11,6 +11,7 @@ interface ExportPanelProps {
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
   const signedDocs = documents.filter(doc => doc.status === 'signed' && doc.signedBlob);
+  const getPlacementCount = (doc: PdfDocument) => doc.placements?.length || (doc.placement ? 1 : 0);
 
   const handleDownloadSingle = (doc: PdfDocument) => {
     if (doc.signedBlob) {
@@ -24,7 +25,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
       const zipBlob = await createZipFromDocuments(documents);
       downloadBlob(zipBlob, 'documentos_assinados.zip');
     } catch (error) {
-      console.error('Error creating ZIP:', error);
+      console.error('Erro ao criar ZIP:', error);
     }
   };
 
@@ -40,16 +41,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
-            Documentos Prontos
-          </h3>
+          <h3 className="text-lg font-semibold text-foreground">Documentos prontos</h3>
           <p className="text-sm text-muted-foreground">
             {signedDocs.length} documento{signedDocs.length > 1 ? 's' : ''} assinado{signedDocs.length > 1 ? 's' : ''}
           </p>
         </div>
 
         {signedDocs.length > 1 && (
-          <Button onClick={handleDownloadAll} variant="default">
+          <Button onClick={handleDownloadAll}>
             <FileArchive className="w-4 h-4 mr-2" />
             Baixar tudo em ZIP
           </Button>
@@ -58,29 +57,20 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
 
       <div className="space-y-2">
         {signedDocs.map(doc => (
-          <div
-            key={doc.id}
-            className="flex items-center justify-between p-4 bg-card rounded-lg border border-border"
-          >
+          <div key={doc.id} className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-success" />
               </div>
               <div>
                 <p className="font-medium text-foreground">{doc.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  Assinado na página {(doc.placement?.pageIndex || 0) + 1}
-                </p>
+                <p className="text-xs text-muted-foreground">{getPlacementCount(doc)} campo(s) aplicado(s)</p>
               </div>
             </div>
 
             <div className="flex gap-2">
               <PdfPreviewModal document={doc} />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownloadSingle(doc)}
-              >
+              <Button variant="outline" size="sm" onClick={() => handleDownloadSingle(doc)}>
                 <Download className="w-4 h-4 mr-2" />
                 Baixar
               </Button>
@@ -91,7 +81,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ documents }) => {
 
       <div className="p-4 bg-muted/50 rounded-lg border border-border">
         <p className="text-xs text-muted-foreground text-center">
-          🔒 Todos os arquivos foram processados localmente no seu navegador.
+          Todos os arquivos foram processados localmente no seu navegador.
           <br />
           Nenhum dado foi enviado para servidores externos.
         </p>
